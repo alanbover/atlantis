@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"regexp"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -185,12 +186,33 @@ func (w *FileWorkspace) recheckDiverged(p models.PullRequest, headRepo models.Re
 		output, err := cmd.CombinedOutput()
 
 		if err != nil {
-			w.Logger.Warn("getting remote update failed: %s", string(output))
+			w.Logger.Warn("getting remote update failed: %s", string(redactGithubCredentials(output)))
 			return false
 		}
 	}
 
 	return w.HasDiverged(cloneDir)
+}
+
+func redactGithubCredentials(text []byte) []byte {
+    regex := regexp.MustCompile(`ghp_\w+`)
+
+    return regex.ReplaceAllFunc(text, func(match []byte) []byte {
+        // Replace each matched substring with asterisks
+        return []byte(maskText(string(match)))
+    })
+}
+
+func maskText(text string) string {
+    masked := ""
+    for _, char := range text {
+        if char != '-' {
+            masked += "*"
+        } else {
+            masked += string(char)
+        }
+    }
+    return masked
 }
 
 func (w *FileWorkspace) HasDiverged(cloneDir string) bool {
